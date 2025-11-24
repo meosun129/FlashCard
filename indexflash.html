@@ -35,7 +35,7 @@
         .card-text {
             font-size: 22px;
             line-height: 1.4;
-            white-space: pre-line;
+            white-space: pre-line; /* 줄바꿈 허용 */
         }
 
         .buttons {
@@ -63,84 +63,81 @@
         }
 
         .info {
-            margin-top: 10px;
+            margin-top: 5px;
             font-size: 13px;
             color: #666;
         }
 
-        .timer-area {
-            margin-top: 6px;
-            font-size: 14px;
+        .timer {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
             color: #333;
-        }
-
-        .timer-buttons {
-            margin-top: 6px;
-            display: flex;
-            justify-content: center;
-            gap: 8px;
         }
     </style>
 </head>
 <body>
 <div class="container">
+    <div id="timerText" class="timer"></div>
+
     <div id="card" class="card">
         <div id="cardText" class="card-text"></div>
     </div>
 
     <div class="buttons">
-        <button id="prevBtn" class="secondary">◀ 이전</button>
+        <button id="prevBtn" class="secondary">◀ 이전 카드</button>
         <button id="toggleBtn" class="secondary">정답 보기</button>
-        <button id="nextBtn" class="primary">다음 ▶</button>
+        <button id="nextBtn" class="secondary">다음 카드 ▶</button>
     </div>
 
-    <div class="timer-area">
-        <span id="timerDisplay">타이머 꺼짐</span>
-    </div>
-
-    <div class="timer-buttons">
-        <button id="start30Btn" class="secondary">30초 타이머</button>
-        <button id="start60Btn" class="secondary">60초 타이머</button>
-        <button id="stopTimerBtn" class="secondary">타이머 끄기</button>
+    <div class="buttons">
+        <button id="timer30Btn" class="primary">30초 후 정답 보기</button>
+        <button id="timer60Btn" class="primary">60초 후 정답 보기</button>
     </div>
 
     <div class="info" id="infoText"></div>
 </div>
 
 <script>
-    // 카드 데이터
-    const cards = [
-        {
-            question: "TCP는 어떤 프로토콜인가?",
-            answer: "연결 지향형 전송 계층 프로토콜\n신뢰성 있는 데이터 전송 보장"
-        },
-        {
-            question: "UDP의 특징은?",
-            answer: "비연결형, 신뢰성 낮지만 빠름\n스트리밍, 게임 등에서 자주 사용"
-        },
-        {
-            question: "MLP와 DNN의 관계는?",
-            answer: "DNN은 은닉층이 많은 MLP의 확장 개념으로 볼 수 있음"
-        }
-    ];
-
+    // 1. 플래시 카드 데이터 (JSON에서 로드할 예정)
+    let cards = [];
     let currentIndex = 0;
     let showingAnswer = false;
 
-    // 요소
+    // 타이머 관련
+    let countdown = 0;
+    let countdownId = null;
+
     const cardTextEl = document.getElementById("cardText");
     const toggleBtn = document.getElementById("toggleBtn");
-    const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
+    const prevBtn = document.getElementById("prevBtn");
     const infoTextEl = document.getElementById("infoText");
-    const timerDisplayEl = document.getElementById("timerDisplay");
+    const cardEl = document.getElementById("card");
 
-    // 타이머 변수
-    let timerId = null;
-    let timerDuration = 0;
-    let timerRemaining = 0;
+    const timerTextEl = document.getElementById("timerText");
+    const timer30Btn = document.getElementById("timer30Btn");
+    const timer60Btn = document.getElementById("timer60Btn");
+
+    // JSON 파일에서 카드 데이터 로드
+    async function loadCards() {
+        try {
+            const res = await fetch("cards.json");
+            cards = await res.json();
+        } catch (err) {
+            console.error(err);
+            cards = [];
+        }
+        updateCard();
+    }
 
     function updateCard() {
+        if (cards.length === 0) {
+            cardTextEl.textContent = "카드가 없습니다. cards.json을 확인하세요.";
+            infoTextEl.textContent = "";
+            return;
+        }
+
         const card = cards[currentIndex];
 
         if (showingAnswer) {
@@ -156,84 +153,69 @@
 
     function toggleCard() {
         showingAnswer = !showingAnswer;
+        stopTimer(); // 수동으로 뒤집으면 타이머는 멈춤
         updateCard();
     }
 
     function nextCard() {
+        if (cards.length === 0) return;
         currentIndex = (currentIndex + 1) % cards.length;
         showingAnswer = false;
+        stopTimer();
         updateCard();
-        resetTimerIfNeeded();
     }
 
     function prevCard() {
+        if (cards.length === 0) return;
         currentIndex = (currentIndex - 1 + cards.length) % cards.length;
         showingAnswer = false;
+        stopTimer();
         updateCard();
-        resetTimerIfNeeded();
-    }
-
-    // 타이머 관련 -------------------------------------
-
-    function updateTimerDisplay() {
-        if (timerId === null) {
-            timerDisplayEl.textContent = "타이머 꺼짐";
-        } else {
-            timerDisplayEl.textContent = `남은 시간: ${timerRemaining}초`;
-        }
-    }
-
-    function clearTimer() {
-        if (timerId !== null) clearInterval(timerId);
-        timerId = null;
-        timerDuration = 0;
-        timerRemaining = 0;
-        updateTimerDisplay();
-    }
-
-    function resetTimerIfNeeded() {
-        if (timerDuration > 0) {
-            timerRemaining = timerDuration;
-            updateTimerDisplay();
-        }
     }
 
     function startTimer(seconds) {
-        clearTimer();
+        if (cards.length === 0) return;
 
-        timerDuration = seconds;
-        timerRemaining = seconds;
-        updateTimerDisplay();
+        // 기존 타이머 정리
+        stopTimer();
 
-        timerId = setInterval(() => {
-            timerRemaining--;
+        countdown = seconds;
+        timerTextEl.textContent = `남은 시간: ${countdown}초`;
 
-            // 타이머 0초 → 정답 자동 표시
-            if (timerRemaining <= 0) {
-                showingAnswer = true;
+        countdownId = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                timerTextEl.textContent = `남은 시간: ${countdown}초`;
+            } else {
+                // 시간 끝!
+                clearInterval(countdownId);
+                countdownId = null;
+                timerTextEl.textContent = "시간 종료! 정답이 공개되었습니다.";
+                showingAnswer = true;       // == 카드 뒷장 보이게
                 updateCard();
-                clearTimer(); // 멈춤
-                return;
             }
-
-            updateTimerDisplay();
         }, 1000);
     }
 
-    // 이벤트 -------------------------------------------------
+    function stopTimer() {
+        if (countdownId !== null) {
+            clearInterval(countdownId);
+            countdownId = null;
+        }
+        timerTextEl.textContent = "";
+    }
 
-    document.getElementById("card").addEventListener("click", toggleCard);
+    // 이벤트 연결
+    cardEl.addEventListener("click", toggleCard);
     toggleBtn.addEventListener("click", toggleCard);
     nextBtn.addEventListener("click", nextCard);
     prevBtn.addEventListener("click", prevCard);
 
-    document.getElementById("start30Btn").addEventListener("click", () => startTimer(30));
-    document.getElementById("start60Btn").addEventListener("click", () => startTimer(60));
-    document.getElementById("stopTimerBtn").addEventListener("click", clearTimer);
+    timer30Btn.addEventListener("click", () => startTimer(30));
+    timer60Btn.addEventListener("click", () => startTimer(60));
 
-    // 초기 표시
-    updateCard();
-    updateTimerDisplay();
+    // 페이지가 로드되면 JSON에서 카드 불러오기
+    loadCards();
 </script>
 </body>
 </html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>플래시 카드</title>
+    <style>
+        body {
+            font-family: Arial, "맑은 고딕", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .card {
+            width: 400px;
+            min-height: 200px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .card-text {
+            font-size: 22px;
+            line-height: 1.4;
+            white-space: pre-line;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .secondary {
+            background: #e0e0e0;
+        }
+
+        .info {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .timer-area {
+            margin-top: 6px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .timer-buttons {
+            margin-top: 6px;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="card" class="card">
+        <div id="cardText" class="card-text"></div>
+    </div>
+
+    <div class="buttons">
+        <button id="prevBtn" class="secondary">◀ 이전</button>
+        <button id="toggleBtn" class="secondary">정답 보기</button>
+        <button id="nextBtn" class="primary">다음 ▶</button>
+    </div>
+
+    <div class="timer-area">
+        <span id="timerDisplay">타이머 꺼짐</span>
+    </div>
+
+    <div class="timer-buttons">
+        <button id="start30Btn" class="secondary">30초 타이머</button>
+        <button id="start60Btn" class="secondary">60초 타이머</button>
+        <button id="stopTimerBtn" class="secondary">타이머 끄기</button>
+    </div>
+
+    <div class="info" id="infoText"></div>
+</div>
+
+<script>
+    // 카드 데이터
+    const cards = [
+        {
+            question: "TCP는 어떤 프로토콜인가?",
+            answer: "연결 지향형 전송 계층 프로토콜\n신뢰성 있는 데이터 전송 보장"
+        },
+        {
+            question: "UDP의 특징은?",
+            answer: "비연결형, 신뢰성 낮지만 빠름\n스트리밍, 게임 등에서 자주 사용"
+        },
+        {
+            question: "MLP와 DNN의 관계는?",
+            answer: "DNN은 은닉층이 많은 MLP의 확장 개념으로 볼 수 있음"
+        }
+    ];
+
+    let currentIndex = 0;
+    let showingAnswer = false;
+
+    // 요소
+    const cardTextEl = document.getElementById("cardText");
+    const toggleBtn = document.getElementById("toggleBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const infoTextEl = document.getElementById("infoText");
+    const timerDisplayEl = document.getElementById("timerDisplay");
+
+    // 타이머 변수
+    let timerId = null;
+    let timerDuration = 0;
+    let timerRemaining = 0;
+
+    function updateCard() {
+        const card = cards[currentIndex];
+
+        if (showingAnswer) {
+            cardTextEl.textContent = "A. " + card.answer;
+            toggleBtn.textContent = "문제 보기";
+        } else {
+            cardTextEl.textContent = "Q. " + card.question;
+            toggleBtn.textContent = "정답 보기";
+        }
+
+        infoTextEl.textContent = `카드 ${currentIndex + 1} / ${cards.length}`;
+    }
+
+    function toggleCard() {
+        showingAnswer = !showingAnswer;
+        updateCard();
+    }
+
+    function nextCard() {
+        currentIndex = (currentIndex + 1) % cards.length;
+        showingAnswer = false;
+        updateCard();
+        resetTimerIfNeeded();
+    }
+
+    function prevCard() {
+        currentIndex = (currentIndex - 1 + cards.length) % cards.length;
+        showingAnswer = false;
+        updateCard();
+        resetTimerIfNeeded();
+    }
+
+    // 타이머 관련 -------------------------------------
+
+    function updateTimerDisplay() {
+        if (timerId === null) {
+            timerDisplayEl.textContent = "타이머 꺼짐";
+        } else {
+            timerDisplayEl.textContent = `남은 시간: ${timerRemaining}초`;
+        }
+    }
+
+    function clearTimer() {
+        if (timerId !== null) clearInterval(timerId);
+        timerId = null;
+        timerDuration = 0;
+        timerRemaining = 0;
+        updateTimerDisplay();
+    }
+
+    function resetTimerIfNeeded() {
+        if (timerDuration > 0) {
+            timerRemaining = timerDuration;
+            updateTimerDisplay();
+        }
+    }
+
+    function startTimer(seconds) {
+        clearTimer();
+
+        timerDuration = seconds;
+        timerRemaining = seconds;
+        updateTimerDisplay();
+
+        timerId = setInterval(() => {
+            timerRemaining--;
+
+            // 타이머 0초 → 정답 자동 표시
+            if (timerRemaining <= 0) {
+                showingAnswer = true;
+                updateCard();
+                clearTimer(); // 멈춤
+                return;
+            }
+
+            updateTimerDisplay();
+        }, 1000);
+    }
+
+    // 이벤트 -------------------------------------------------
+
+    document.getElementById("card").addEventListener("click", toggleCard);
+    toggleBtn.addEventListener("click", toggleCard);
+    nextBtn.addEventListener("click", nextCard);
+    prevBtn.addEventListener("click", prevCard);
+
+    document.getElementById("start30Btn").addEventListener("click", () => startTimer(30));
+    document.getElementById("start60Btn").addEventListener("click", () => startTimer(60));
+    document.getElementById("stopTimerBtn").addEventListener("click", clearTimer);
+
+    // 초기 표시
+    updateCard();
+    updateTimerDisplay();
+</script>
+</body>
+</html>

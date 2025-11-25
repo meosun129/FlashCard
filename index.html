@@ -16,10 +16,11 @@
 
         .container {
             text-align: center;
+            width: 420px;
         }
 
         .card {
-            width: 400px;
+            width: 100%;
             min-height: 200px;
             background: white;
             border-radius: 12px;
@@ -35,7 +36,13 @@
         .card-text {
             font-size: 22px;
             line-height: 1.4;
-            white-space: pre-line; /* 줄바꿈 허용 */
+            white-space: pre-line;
+        }
+
+        .info {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #666;
         }
 
         .buttons {
@@ -53,110 +60,101 @@
             cursor: pointer;
         }
 
-        .primary {
-            background: #007bff;
-            color: white;
+        .primary { background: #007bff; color: white; }
+        .secondary { background: #e0e0e0; }
+        .danger { background: #ff5252; color: white; }
+
+        .input-box {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
         }
 
-        .secondary {
-            background: #e0e0e0;
-        }
-
-        .info {
-            margin-top: 5px;
-            font-size: 13px;
-            color: #666;
-        }
-
-        .timer {
-            font-size: 18px;
-            font-weight: bold;
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
             margin-bottom: 8px;
-            color: #333;
+            border-radius: 6px;
+            border: 1px solid #ccc;
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <div id="timerText" class="timer"></div>
 
+<div class="container">
+
+    <!-- 카드 영역 -->
     <div id="card" class="card">
         <div id="cardText" class="card-text"></div>
     </div>
 
+    <!-- 기본 버튼 -->
     <div class="buttons">
-        <button id="prevBtn" class="secondary">◀ 이전 카드</button>
-        <button id="toggleBtn" class="secondary">정답 보기</button>
-        <button id="nextBtn" class="secondary">다음 카드 ▶</button>
+        <button id="prevBtn" class="secondary">◀ 이전</button>
+        <button id="toggleBtn" class="primary">정답 보기</button>
+        <button id="nextBtn" class="secondary">다음 ▶</button>
     </div>
 
+    <!-- 자동 타이머 -->
     <div class="buttons">
-        <button id="timer30Btn" class="primary">30초 후 정답 보기</button>
-        <button id="timer60Btn" class="primary">60초 후 정답 보기</button>
+        <button onclick="startTimer(30)" class="secondary">30초 뒤 정답</button>
+        <button onclick="startTimer(60)" class="secondary">60초 뒤 정답</button>
     </div>
 
+    <div class="info" id="timerText"></div>
     <div class="info" id="infoText"></div>
+
+    <!-- 카드 추가 기능 -->
+    <div class="input-box">
+        <input id="newQuestion" placeholder="앞면(문제)을 입력하세요">
+        <textarea id="newAnswer" placeholder="뒷면(정답)을 입력하세요"></textarea>
+        <button onclick="addCard()" class="primary">카드 추가</button>
+        <button onclick="deleteCard()" class="danger">현재 카드 삭제</button>
+    </div>
+
 </div>
 
 <script>
-    // 1. 플래시 카드 데이터 (JSON에서 로드할 예정)
-    let cards = [];
+    // --- 데이터 관리 (로컬 스토리지 사용) ---
+    let cards = JSON.parse(localStorage.getItem("cards")) || [
+        { question: "TCP는 어떤 프로토콜인가?", answer: "연결 지향형 전송 계층 프로토콜\n신뢰성 있는 데이터 전송 보장" },
+        { question: "UDP의 특징은?", answer: "비연결형, 신뢰성 낮지만 빠름\n스트리밍, 게임 등에서 자주 사용" }
+    ];
     let currentIndex = 0;
     let showingAnswer = false;
-
-    // 타이머 관련
-    let countdown = 0;
-    let countdownId = null;
+    let timer = null;
+    let timeLeft = 0;
 
     const cardTextEl = document.getElementById("cardText");
     const toggleBtn = document.getElementById("toggleBtn");
-    const nextBtn = document.getElementById("nextBtn");
-    const prevBtn = document.getElementById("prevBtn");
     const infoTextEl = document.getElementById("infoText");
-    const cardEl = document.getElementById("card");
-
     const timerTextEl = document.getElementById("timerText");
-    const timer30Btn = document.getElementById("timer30Btn");
-    const timer60Btn = document.getElementById("timer60Btn");
 
-    // JSON 파일에서 카드 데이터 로드
-    async function loadCards() {
-        try {
-            const res = await fetch("cards.json");
-            cards = await res.json();
-        } catch (err) {
-            console.error(err);
-            cards = [];
-        }
-        updateCard();
+    function saveCards() {
+        localStorage.setItem("cards", JSON.stringify(cards));
     }
 
+    // --- 화면 업데이트 ---
     function updateCard() {
         if (cards.length === 0) {
-            cardTextEl.textContent = "카드가 없습니다. cards.json을 확인하세요.";
+            cardTextEl.textContent = "카드가 없습니다.";
             infoTextEl.textContent = "";
+            toggleBtn.disabled = true;
             return;
         }
 
+        toggleBtn.disabled = false;
+
         const card = cards[currentIndex];
-
-        if (showingAnswer) {
-            cardTextEl.textContent = "A. " + card.answer;
-            toggleBtn.textContent = "문제 보기";
-        } else {
-            cardTextEl.textContent = "Q. " + card.question;
-            toggleBtn.textContent = "정답 보기";
-        }
-
+        cardTextEl.textContent = showingAnswer ? "A. " + card.answer : "Q. " + card.question;
+        toggleBtn.textContent = showingAnswer ? "문제 보기" : "정답 보기";
         infoTextEl.textContent = `카드 ${currentIndex + 1} / ${cards.length}`;
     }
 
-    function toggleCard() {
-        showingAnswer = !showingAnswer;
-        stopTimer(); // 수동으로 뒤집으면 타이머는 멈춤
-        updateCard();
-    }
-
+    // --- 이전/다음 카드 ---
     function nextCard() {
         if (cards.length === 0) return;
         currentIndex = (currentIndex + 1) % cards.length;
@@ -173,49 +171,80 @@
         updateCard();
     }
 
-    function startTimer(seconds) {
+    // --- 카드 앞/뒤 뒤집기 ---
+    function toggleCard() {
+        showingAnswer = !showingAnswer;
+        stopTimer();
+        updateCard();
+    }
+
+    // --- 카드 추가 ---
+    function addCard() {
+        const q = document.getElementById("newQuestion").value.trim();
+        const a = document.getElementById("newAnswer").value.trim();
+
+        if (!q || !a) {
+            alert("앞면과 뒷면을 모두 입력하세요.");
+            return;
+        }
+
+        cards.push({ question: q, answer: a });
+        saveCards();
+
+        document.getElementById("newQuestion").value = "";
+        document.getElementById("newAnswer").value = "";
+
+        alert("카드가 추가되었습니다!");
+        updateCard();
+    }
+
+    // --- 카드 삭제 ---
+    function deleteCard() {
         if (cards.length === 0) return;
 
-        // 기존 타이머 정리
+        if (!confirm("현재 카드를 삭제할까요?")) return;
+
+        cards.splice(currentIndex, 1);
+        saveCards();
+
+        if (currentIndex >= cards.length) currentIndex = 0;
+
+        showingAnswer = false;
+        updateCard();
+    }
+
+    // --- 자동 타이머 ---
+    function startTimer(seconds) {
         stopTimer();
+        timeLeft = seconds;
+        timerTextEl.textContent = `${timeLeft}초 후 정답 공개`;
 
-        countdown = seconds;
-        timerTextEl.textContent = `남은 시간: ${countdown}초`;
+        timer = setInterval(() => {
+            timeLeft--;
+            timerTextEl.textContent = `${timeLeft}초 남음`;
 
-        countdownId = setInterval(() => {
-            countdown--;
-            if (countdown > 0) {
-                timerTextEl.textContent = `남은 시간: ${countdown}초`;
-            } else {
-                // 시간 끝!
-                clearInterval(countdownId);
-                countdownId = null;
-                timerTextEl.textContent = "시간 종료! 정답이 공개되었습니다.";
-                showingAnswer = true;       // == 카드 뒷장 보이게
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                showingAnswer = true;
                 updateCard();
+                timerTextEl.textContent = "정답 공개됨!";
             }
         }, 1000);
     }
 
     function stopTimer() {
-        if (countdownId !== null) {
-            clearInterval(countdownId);
-            countdownId = null;
-        }
+        clearInterval(timer);
         timerTextEl.textContent = "";
     }
 
-    // 이벤트 연결
-    cardEl.addEventListener("click", toggleCard);
-    toggleBtn.addEventListener("click", toggleCard);
-    nextBtn.addEventListener("click", nextCard);
-    prevBtn.addEventListener("click", prevCard);
+    // --- 카드 클릭 이벤트 ---
+    document.getElementById("card").addEventListener("click", toggleCard);
+    document.getElementById("toggleBtn").addEventListener("click", toggleCard);
+    document.getElementById("nextBtn").addEventListener("click", nextCard);
+    document.getElementById("prevBtn").addEventListener("click", prevCard);
 
-    timer30Btn.addEventListener("click", () => startTimer(30));
-    timer60Btn.addEventListener("click", () => startTimer(60));
-
-    // 페이지가 로드되면 JSON에서 카드 불러오기
-    loadCards();
+    updateCard();
 </script>
+
 </body>
 </html>
